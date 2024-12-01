@@ -1,14 +1,17 @@
 /**:
   ros__parameters:
+    history_policy: "history_keep_last"
+    reliability_policy: "reliability_best_effort"
+
     # Topics
-    pointCloudTopic: "points_raw"               # Point cloud data
-    imuTopic: "imu_raw"                         # IMU data
+    pointCloudTopic: "/ouster/points"               # Point cloud data
+    imuTopic: "/imu/data_raw"                         # IMU data
     odomTopic: "odometry/imu"                   # IMU pre-preintegration odometry, same frequency as IMU
-    gpsTopic: "odometry/gpsz"                   # GPS odometry topic from navsat, see module_navsat.launch file
+    gpsTopic: "/gnss/fix"                   # GPS odometry topic from navsat, see module_navsat.launch file
 
     # Frames
-    lidarFrame: "base_link"
-    baselinkFrame: "base_link"
+    lidarFrame: "lidar_front"
+    baselinkFrame: "gps_frame"
     odometryFrame: "odom"
     mapFrame: "map"
 
@@ -24,8 +27,8 @@
 
     # Sensor Settings
     sensor: ouster                            # lidar sensor type, 'velodyne' or 'ouster' or 'livox' or 'robosense'
-    N_SCAN: 128                                  # number of lidar channel (i.e., Velodyne/Ouster: 16, 32, 64, 128, Livox Horizon: 6)
-    Horizon_SCAN: 1024                          # lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048, Livox Horizon: 4000)
+    N_SCAN: 64                                  # number of lidar channel (i.e., Velodyne/Ouster: 16, 32, 64, 128, Livox Horizon: 6)
+    Horizon_SCAN: 2048                          # lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048, Livox Horizon: 4000)
     downsampleRate: 2                           # default: 1. Downsample your data if too many points(line). i.e., 16 = 64 / 4, 16 = 16 / 1
     point_filter_num: 5                         # default: 3. Downsample your data if too many points(point). e.g., 16: 1, 32: 5, 64: 8
     lidarMinRange: 1.0                          # default: 1.0, minimum lidar range to be used
@@ -33,7 +36,7 @@
 
     # IMU Settings
     imuType: 0                                  # 0: 6-axis  1: 9-axis
-    imuRate: 500.0
+    imuRate: 125.0
     imuAccNoise: 3.9939570888238808e-03
     imuGyrNoise: 1.5636343949698187e-03
     imuAccBiasN: 6.4356659353532566e-05

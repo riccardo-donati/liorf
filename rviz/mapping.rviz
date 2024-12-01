@@ -3,9 +3,15 @@ Panels:
     Help Height: 70
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /Mapping1
+        - /Mapping1/Path1
+        - /Mapping1/Path1/Topic1
+        - /Mapping1/GlobalMap1/Status1
+        - /Mapping1/GlobalMap1/Topic1
+        - /Mapping1/LIO1/Topic1
       Splitter Ratio: 0.5
-    Tree Height: 822
+    Tree Height: 801
   - Class: rviz_common/Views
     Expanded:
       - /Current View1
@@ -56,16 +62,17 @@ Visualization Manager:
           Shaft Length: 0.10000000149011612
           Topic:
             Depth: 5
-            Durability Policy: Volatile
+            Durability Policy: System Default
+            Filter size: 10
             History Policy: Keep Last
-            Reliability Policy: Reliable
+            Reliability Policy: Best Effort
             Value: /liorf/mapping/path
           Value: true
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 21.51711654663086
-            Min Value: -0.5904507637023926
+            Max Value: -742.4560546875
+            Min Value: -895.3157958984375
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -88,8 +95,9 @@ Visualization Manager:
           Topic:
             Depth: 5
             Durability Policy: Volatile
+            Filter size: 10
             History Policy: Keep Last
-            Reliability Policy: Reliable
+            Reliability Policy: Best Effort
             Value: /liorf/mapping/cloud_registered_raw
           Use Fixed Frame: true
           Use rainbow: true
@@ -109,9 +117,9 @@ Visualization Manager:
           Enabled: true
           Invert Rainbow: false
           Max Color: 255; 255; 255
-          Max Intensity: 245
+          Max Intensity: 5541
           Min Color: 0; 0; 0
-          Min Intensity: 0
+          Min Intensity: 4
           Name: GlobalMap
           Position Transformer: XYZ
           Selectable: true
@@ -121,8 +129,9 @@ Visualization Manager:
           Topic:
             Depth: 5
             Durability Policy: Volatile
+            Filter size: 10
             History Policy: Keep Last
-            Reliability Policy: Reliable
+            Reliability Policy: Best Effort
             Value: /liorf/mapping/map_global
           Use Fixed Frame: true
           Use rainbow: true
@@ -161,8 +170,9 @@ Visualization Manager:
           Topic:
             Depth: 5
             Durability Policy: Volatile
+            Filter size: 10
             History Policy: Keep Last
-            Reliability Policy: Reliable
+            Reliability Policy: Best Effort
             Value: /liorf/mapping/odometry
           Value: true
       Enabled: true
@@ -187,6 +197,9 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /clicked_point
     - Class: rviz_default_plugins/SetInitialPose
+      Covariance x: 0.25
+      Covariance y: 0.25
+      Covariance yaw: 0.06853891909122467
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -207,35 +220,35 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 104.62234497070312
+      Distance: 1591.8792724609375
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: 112.5791015625
+        Y: 43.539852142333984
+        Z: -0.12051386386156082
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0403980016708374
+      Pitch: 0.6697970628738403
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 2.250396966934204
+      Yaw: 0.8854036331176758
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1043
+  Height: 1016
   Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd000000020000000000000156000003b9fc0200000001fb000000100044006900730070006c006100790073010000003d000003b9000000c900ffffff00000001000001cb000003b9fc0200000001fb0000000a00560069006500770073000000003d000003b9000000a400ffffff00000624000003b900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd000000030000000000000156000003a2fc0200000001fb000000100044006900730070006c006100790073010000003b000003a2000000c700ffffff00000001000001cb000003b9fc0200000001fb0000000a00560069006500770073000000003d000003b9000000a000ffffff000000020000078000000016fc0100000001fb0000000a0049006d0061006700650100000000000007800000000000000000000005de000003a200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Views:
     collapsed: true
-  Width: 1920
-  X: 2560
-  Y: 0
+  Width: 1850
+  X: 1990
+  Y: 27
