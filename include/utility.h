@@ -122,8 +122,14 @@ public:
     Eigen::Matrix3d extRPY;
     Eigen::Vector3d extTrans;
     Eigen::Quaterniond extQRPY;
-
+    // LOAM
+    float edgeThreshold;
+    float surfThreshold;
+    int edgeFeatureMinValidNum;
+    int surfFeatureMinValidNum;
     // voxel filter paprams
+    float odometrySurfLeafSize;
+    float mappingCornerLeafSize;
     float mappingSurfLeafSize ;
     float surroundingKeyframeMapLeafSize;
     float loopClosureICPSurfLeafSize ;

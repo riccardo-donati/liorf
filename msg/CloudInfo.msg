@@ -1,6 +1,12 @@
 # Cloud Info
 std_msgs/Header header 
 
+int32[] start_ring_index
+int32[] end_ring_index
+
+int32[]  point_col_ind # point column index in range image
+float32[] point_range # point range 
+
 int64 imuavailable
 int64 odomavailable
 

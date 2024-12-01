@@ -83,6 +83,13 @@ add_executable(${PROJECT_NAME}_imuPreintegration src/imuPreintegration.cpp ${com
 ament_target_dependencies(${PROJECT_NAME}_imuPreintegration ${ros2_lib})
 target_link_libraries(${PROJECT_NAME}_imuPreintegration Boost::timer "${cpp_typesupport_target}" ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} gtsam)
 
+# Feature Extraction
+add_executable(${PROJECT_NAME}_featureExtraction src/featureExtraction.cpp)
+ament_target_dependencies(${PROJECT_NAME}_featureExtraction rclcpp rclpy std_msgs sensor_msgs geometry_msgs nav_msgs pcl_conversions pcl_msgs visualization_msgs tf2 tf2_ros tf2_eigen tf2_sensor_msgs tf2_geometry_msgs OpenCV PCL)
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(${PROJECT_NAME}_featureExtraction "${cpp_typesupport_target}") 
+
+
 install(
   DIRECTORY launch config rviz
   DESTINATION share/${PROJECT_NAME}/
@@ -93,6 +100,7 @@ install(
 	${PROJECT_NAME}_imageProjection
 	${PROJECT_NAME}_imuPreintegration
 	${PROJECT_NAME}_mapOptmization
+  ${PROJECT_NAME}_featureExtraction
   DESTINATION lib/${PROJECT_NAME}
 )
 
