@@ -27,13 +27,13 @@ def generate_launch_description():
             parameters=[parameter_file],
             output='screen'
         ),
-        Node(
-            package='liorf',
-            executable='liorf_imuPreintegration',
-            name='liorf_imuPreintegration',
-            parameters=[parameter_file],
-            output='screen'
-        ),
+        # Node(
+        #     package='liorf',
+        #     executable='liorf_imuPreintegration',
+        #     name='liorf_imuPreintegration',
+        #     parameters=[parameter_file],
+        #     output='screen'
+        # )
         Node(
             package='liorf',
             executable='liorf_imageProjection',
@@ -41,13 +41,13 @@ def generate_launch_description():
             parameters=[parameter_file],
             output='screen'
         ),
-        Node(
-            package='liorf',
-            executable='liorf_mapOptmization',
-            name='liorf_mapOptmization',
-            parameters=[parameter_file],
-            output='screen'
-        ),
+        # Node(
+        #     package='liorf',
+        #     executable='liorf_mapOptmization',
+        #     name='liorf_mapOptmization',
+        #     parameters=[parameter_file],
+        #     output='screen'
+        # ),
         # Node(
         #     package='rviz2',
         #     executable='rviz2',
