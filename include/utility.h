@@ -275,6 +275,19 @@ public:
         extRPY = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extRPYV.data(), 3, 3);
         extTrans = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extTransV.data(), 3, 1);
         extQRPY = Eigen::Quaterniond(extRPY).inverse();
+        declare_parameter("edgeThreshold", 1.0);
+        get_parameter("edgeThreshold", edgeThreshold);
+        declare_parameter("surfThreshold", 0.1);
+        get_parameter("surfThreshold", surfThreshold);
+        declare_parameter("edgeFeatureMinValidNum", 10);
+        get_parameter("edgeFeatureMinValidNum", edgeFeatureMinValidNum);
+        declare_parameter("surfFeatureMinValidNum", 100);
+        get_parameter("surfFeatureMinValidNum", surfFeatureMinValidNum);
+
+        declare_parameter("odometrySurfLeafSize", 0.4);
+        get_parameter("odometrySurfLeafSize", odometrySurfLeafSize);
+        declare_parameter("mappingCornerLeafSize", 0.2);
+        get_parameter("mappingCornerLeafSize", mappingCornerLeafSize);
 
         declare_parameter<float>("mappingSurfLeafSize", 0.2f);
         get_parameter("mappingSurfLeafSize", mappingSurfLeafSize);

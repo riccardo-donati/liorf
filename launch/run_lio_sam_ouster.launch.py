@@ -48,6 +48,13 @@ def generate_launch_description():
             parameters=[parameter_file],
             output='screen'
         ),
+        Node(
+            package='liorf',
+            executable='liorf_featureExtraction',
+            name='liorf_featureExtraction',
+            parameters=[parameter_file],
+            output='screen'
+        ),
         # Node(
         #     package='rviz2',
         #     executable='rviz2',
