@@ -227,6 +227,7 @@ public:
                 for (int k = sp; k <= ep; k++)
                 {
                     if (cloudLabel[k] <= 0){
+                    // if (cloudLabel[k] == -1){ // TEMP
                         surfaceCloudScan->push_back(extractedCloud->points[k]);
                     }
                 }

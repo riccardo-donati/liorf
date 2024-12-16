@@ -19,15 +19,15 @@ struct OusterPointXYZIRT {
     float intensity;
     uint32_t t;
     uint16_t reflectivity;
-    uint8_t ring;
-    uint16_t noise;
+    uint16_t ring;
+    uint16_t ambient;
     uint32_t range;
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
 POINT_CLOUD_REGISTER_POINT_STRUCT(OusterPointXYZIRT,
     (float, x, x) (float, y, y) (float, z, z) (float, intensity, intensity)
     (uint32_t, t, t) (uint16_t, reflectivity, reflectivity)
-    (uint8_t, ring, ring) (uint16_t, noise, noise) (uint32_t, range, range)
+    (uint16_t, ring, ring) (uint16_t, ambient, ambient) (uint32_t, range, range)
 )
 
 struct RobosensePointXYZIRT
@@ -209,7 +209,7 @@ public:
     }
 
     void cloudHandler(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg)
-    {
+    {   
         if (!cachePointCloud(laserCloudMsg))
             return;
 
@@ -301,7 +301,7 @@ public:
 
         // get timestamp
         cloudHeader = currentCloudMsg.header;
-        timeScanCur = rclcpp::Time(cloudHeader.stamp).seconds();
+        timeScanCur = ROS_TIME(cloudHeader.stamp);
         timeScanEnd = timeScanCur + laserCloudIn->points.back().time;
 
         // check dense flag
@@ -356,7 +356,9 @@ public:
         std::lock_guard<std::mutex> lock2(odoLock);
 
         // make sure IMU data available for the scan
-        if (imuQueue.empty() || ROS_TIME(imuQueue.front().header.stamp) > timeScanCur || ROS_TIME(imuQueue.back().header.stamp) < timeScanEnd)
+        if (imuQueue.empty() || 
+            ROS_TIME(imuQueue.front().header.stamp) > timeScanCur || 
+            ROS_TIME(imuQueue.back().header.stamp) < timeScanEnd)
         {
             RCLCPP_DEBUG(get_logger(), "Waiting for IMU data ...");
             return false;
@@ -473,6 +475,8 @@ public:
         cloudInfo.initialguessz = startOdomMsg.pose.pose.position.z;
         cloudInfo.initialguessroll  = roll;
         cloudInfo.initialguesspitch = pitch;
+        // cloudInfo.initialguessroll  = 0; // TEMP roll 0
+        // cloudInfo.initialguesspitch = 0; // TEMP pitch 0
         cloudInfo.initialguessyaw   = yaw;
 
         cloudInfo.odomavailable = true;
@@ -597,6 +601,8 @@ public:
             thisPoint.x = laserCloudIn->points[i].x;
             thisPoint.y = laserCloudIn->points[i].y;
             thisPoint.z = laserCloudIn->points[i].z;
+            if(thisPoint.z <= 0)
+                continue;
             thisPoint.intensity = laserCloudIn->points[i].intensity;
 
             float range = common_lib_->pointDistance(thisPoint);

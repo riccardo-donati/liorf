@@ -23,7 +23,11 @@
 
 #include "Scancontext.h"
 
+// Project Dependencies
+#include "config/map_constants.hpp"
+
 using namespace gtsam;
+using namespace move::common::config;
 
 using symbol_shorthand::X; // Pose3 (x,y,z,r,p,y)
 using symbol_shorthand::V; // Vel   (xdot,ydot,zdot)
@@ -172,6 +176,8 @@ public:
 
     std::unique_ptr<tf2_ros::TransformBroadcaster> br;
 
+    bool first_gps = false;
+
     mapOptimization(const rclcpp::NodeOptions & options) : ParamServer("liorf_mapOptimization", options)
     {
         ISAM2Params parameters;
@@ -212,6 +218,13 @@ public:
         br = std::make_unique<tf2_ros::TransformBroadcaster>(this);
 
         allocateMemory();
+
+        if (gpsPreInitialized){
+            gps_trans_.Reset(REFERENCE_POINTS_LAT[0], REFERENCE_POINTS_LON[0], REFERENCE_POINTS_ALT[0]);
+            RCLCPP_WARN(get_logger(), "GPS frame initialized in %s: lat= %f, lon= %f, alt= %f",REFERENCE_POINTS_NAMES[0].data(), REFERENCE_POINTS_LAT[0],  REFERENCE_POINTS_LON[0], REFERENCE_POINTS_ALT[0]);
+            first_gps = true;
+        }
+
     }
 
     void allocateMemory()
@@ -300,15 +313,20 @@ public:
     }
 
     void gpsHandler(const sensor_msgs::msg::NavSatFix::SharedPtr gpsMsg)
-    {
-        if (gpsMsg->status.status < 1)
+    {   
+        auto cov_x = gpsMsg->position_covariance[0];
+        auto cov_y = gpsMsg->position_covariance[4];
+        auto cov_z = gpsMsg->position_covariance[8];
+
+        if (cov_x > gpsCovThreshold || cov_y > gpsCovThreshold)
             return;
 
         Eigen::Vector3d trans_local_;
-        static bool first_gps = false;
         if (!first_gps) {
             first_gps = true;
             gps_trans_.Reset(gpsMsg->latitude, gpsMsg->longitude, gpsMsg->altitude);
+            RCLCPP_WARN(get_logger(), "GPS frame reset: lat= %f, lon= %f, alt= %f", gpsMsg->latitude,  gpsMsg->longitude, gpsMsg->altitude);
+
         }
 
         gps_trans_.Forward(gpsMsg->latitude, gpsMsg->longitude, gpsMsg->altitude, trans_local_[0], trans_local_[1], trans_local_[2]);
@@ -319,6 +337,10 @@ public:
         gps_odom.pose.pose.position.x = trans_local_[0];
         gps_odom.pose.pose.position.y = trans_local_[1];
         gps_odom.pose.pose.position.z = trans_local_[2];
+        gps_odom.pose.covariance[0] = cov_x;
+        gps_odom.pose.covariance[7] = cov_y;
+        gps_odom.pose.covariance[14] = cov_z;
+
         tf2::Quaternion quat_tf;
         quat_tf.setRPY(0.0, 0.0, 0.0);
         geometry_msgs::msg::Quaternion quat_msg;
@@ -416,8 +438,15 @@ public:
       else saveMapDirectory = std::getenv("HOME") + req->destination;
       cout << "Save destination: " << saveMapDirectory << endl;
       // create directory and remove old files;
-      int unused = system((std::string("exec rm -r ") + saveMapDirectory).c_str());
-      unused = system((std::string("mkdir -p ") + saveMapDirectory).c_str());
+      if (!fs::exists(saveMapDirectory)) {
+        // If directory does not exist, create it
+        fs::create_directories(saveMapDirectory);
+        std::cout << "Directory created: " << saveMapDirectory << std::endl;
+      } else {
+        int unused = system((std::string("exec rm -r ") + saveMapDirectory).c_str());
+        unused = system((std::string("mkdir -p ") + saveMapDirectory).c_str());
+      }
+        
       // save key frame transformations
       pcl::io::savePCDFileBinary(saveMapDirectory + "/trajectory.pcd", *cloudKeyPoses3D);
       pcl::io::savePCDFileBinary(saveMapDirectory + "/transformations.pcd", *cloudKeyPoses6D);
@@ -437,8 +466,9 @@ public:
       {
         cout << "\n\nSave resolution: " << req->resolution << endl;
         downSizeFilterCorner.setInputCloud(globalCornerCloud);
+        downSizeFilterCorner.setLeafSize(req->resolution, req->resolution, req->resolution);
         downSizeFilterCorner.filter(*globalCornerCloudDS);
-        pcl::io::savePCDFileASCII(savePCDDirectory + "cloudCorner.pcd", *globalCornerCloudDS);
+        pcl::io::savePCDFileASCII(saveMapDirectory + "/CornerMap.pcd", *globalCornerCloudDS);
         // down-sample and save surf cloud
         downSizeFilterSurf.setInputCloud(globalSurfCloud);
         downSizeFilterSurf.setLeafSize(req->resolution, req->resolution, req->resolution);
@@ -460,6 +490,8 @@ public:
       res->success = ret == 0;
 
       downSizeFilterSurf.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
+      downSizeFilterCorner.setLeafSize(mappingCornerLeafSize, mappingCornerLeafSize, mappingCornerLeafSize);
+
 
       cout << "****************************************************" << endl;
       cout << "Saving map to pcd files completed\n" << endl;
@@ -1549,6 +1581,11 @@ public:
             gtsam::Pose3 poseTo   = trans2gtsamPose(transformTobeMapped);
             gtSAMgraph.add(BetweenFactor<Pose3>(cloudKeyPoses3D->size()-1, cloudKeyPoses3D->size(), poseFrom.between(poseTo), odometryNoise));
             initialEstimate.insert(cloudKeyPoses3D->size(), poseTo);
+
+            // gtsam::Vector variances = odometryNoise->sigmas().array().square(); // Variances are the square of sigmas
+            // std::cout << "Noise OdomFactor: " << variances.transpose() << std::endl;
+
+            RCLCPP_WARN(get_logger(), "Added Odom Factor !");
         }
     }
 
@@ -1562,19 +1599,25 @@ public:
             return;
         else
         {
-            if (common_lib_->pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0)
+            if (common_lib_->pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0){
                 return;
+            }
         }
+        // RCLCPP_WARN(get_logger(), "Pose Covariance Threshold: %f", poseCovThreshold);
 
         // pose covariance small, no need to correct
-        if (poseCovariance(3,3) < poseCovThreshold && poseCovariance(4,4) < poseCovThreshold)
+        if (poseCovariance(3,3) < poseCovThreshold && poseCovariance(4,4) < poseCovThreshold){
+            RCLCPP_WARN(get_logger()," pose covariance small, no need to correct");
             return;
+        }
+        RCLCPP_WARN(get_logger(), "Pose Covariance(3,3): %f  Pose Covariance(4,4): %f", poseCovariance(3,3),poseCovariance(4,4));
+
 
         // last gps position
         static PointType lastGPSPoint;
 
         while (!gpsQueue.empty())
-        {
+        {   
             if (ROS_TIME(gpsQueue.front().header.stamp) < timeLaserInfoCur - 0.2)
             {
                 // message too old
@@ -1586,7 +1629,9 @@ public:
                 break;
             }
             else
-            {
+            {   
+                RCLCPP_WARN(get_logger(), "Got GPS with correct stamp");
+                
                 nav_msgs::msg::Odometry thisGPS = gpsQueue.front();
                 gpsQueue.pop_front();
 
@@ -1594,8 +1639,12 @@ public:
                 float noise_x = thisGPS.pose.covariance[0];
                 float noise_y = thisGPS.pose.covariance[7];
                 float noise_z = thisGPS.pose.covariance[14];
-                if (noise_x > gpsCovThreshold || noise_y > gpsCovThreshold)
+                RCLCPP_WARN(get_logger(), "GPS Covariance(0): %f  GPS Covariance(7): %f",noise_x,noise_y);
+
+                if (noise_x > gpsCovThreshold || noise_y > gpsCovThreshold){
+                    RCLCPP_WARN(get_logger(), "GPS Covariance too big");
                     continue;
+                }
 
                 float gps_x = thisGPS.pose.pose.position.x;
                 float gps_y = thisGPS.pose.pose.position.y;
@@ -1607,8 +1656,10 @@ public:
                 }
 
                 // GPS not properly initialized (0,0,0)
-                if (abs(gps_x) < 1e-6 && abs(gps_y) < 1e-6)
+                if (abs(gps_x) < 1e-6 && abs(gps_y) < 1e-6){
+                    RCLCPP_WARN(get_logger(), "GPS not properly initialized (0,0,0)");
                     continue;
+                }
 
                 // Add GPS every a few meters
                 PointType curGPSPoint;
@@ -1625,6 +1676,7 @@ public:
                 noiseModel::Diagonal::shared_ptr gps_noise = noiseModel::Diagonal::Variances(Vector3);
                 gtsam::GPSFactor gps_factor(cloudKeyPoses3D->size(), gtsam::Point3(gps_x, gps_y, gps_z), gps_noise);
                 gtSAMgraph.add(gps_factor);
+                RCLCPP_WARN(get_logger(), "Added GPS Factor !");
 
                 aLoopIsClosed = true;
                 break;
@@ -1644,7 +1696,12 @@ public:
             gtsam::Pose3 poseBetween = loopPoseQueue[i];
             // gtsam::noiseModel::Diagonal::shared_ptr noiseBetween = loopNoiseQueue[i];
             auto noiseBetween = loopNoiseQueue[i];
+
+            // gtsam::Vector variances = noiseBetween->sigmas().array().square(); // Variances are the square of sigmas
+            // std::cout << "Noise LoopClosure: " << variances.transpose() << std::endl;
             gtSAMgraph.add(BetweenFactor<Pose3>(indexFrom, indexTo, poseBetween, noiseBetween));
+            RCLCPP_WARN(get_logger(), "Added Loop Factor !");
+
         }
 
         loopIndexQueue.clear();
@@ -1661,6 +1718,10 @@ public:
         // odom factor
         addOdomFactor();
 
+        std::cout << "Diagonal elements of poseCovariance:" << std::endl;
+        for (int i = 0; i < poseCovariance.rows(); ++i) {
+            std::cout << "poseCovariance(" << i << "," << i << ") = " << poseCovariance(i, i) << std::endl;
+        }
         // gps factor
         addGPSFactor();
 
@@ -1842,7 +1903,7 @@ public:
         geometry_msgs::msg::TransformStamped trans_odom_to_lidar;
         tf2::convert(temp_odom_to_lidar, trans_odom_to_lidar);
         trans_odom_to_lidar.child_frame_id = lidarFrame;
-        br->sendTransform(trans_odom_to_lidar);
+        // br->sendTransform(trans_odom_to_lidar);
 
         // Publish odometry for ROS (incremental)
         static bool lastIncreOdomPubFlag = false;
@@ -1891,9 +1952,10 @@ public:
             geometry_msgs::msg::Quaternion quat_msg;
             tf2::convert(quat_tf, quat_msg);
             laserOdomIncremental.pose.pose.orientation = quat_msg;
-            if (isDegenerate)
+            if (isDegenerate){
+                RCLCPP_WARN(get_logger(), "Odom is DEGENERATE ! ");
                 laserOdomIncremental.pose.covariance[0] = 1;
-            else
+            }else
                 laserOdomIncremental.pose.covariance[0] = 0;
         }
         pubLaserOdometryIncremental->publish(laserOdomIncremental);

@@ -57,8 +57,10 @@
 #include <array>
 #include <thread>
 #include <mutex>
+#include <filesystem>
 
 using namespace std;
+namespace fs = std::filesystem;
 
 typedef pcl::PointXYZI PointType;
 
@@ -160,6 +162,9 @@ public:
     float globalMapVisualizationSearchRadius;
     float globalMapVisualizationPoseDensity;
     float globalMapVisualizationLeafSize;
+
+    // Gps initialization
+    bool gpsPreInitialized;
 
     ParamServer(std::string node_name, const rclcpp::NodeOptions & options) : Node(node_name, options)
     {   
@@ -336,6 +341,10 @@ public:
         get_parameter("globalMapVisualizationPoseDensity", globalMapVisualizationPoseDensity);
         declare_parameter<float>("globalMapVisualizationLeafSize", 1.0f);
         get_parameter("globalMapVisualizationLeafSize", globalMapVisualizationLeafSize);
+
+
+        declare_parameter<bool>("gpsPreInitialized", false);
+        get_parameter("gpsPreInitialized", gpsPreInitialized);
 
         usleep(100);
     }

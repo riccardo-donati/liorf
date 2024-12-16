@@ -7,6 +7,10 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g -pthread")
 
 include(cmake/rosidl_get_typesupport_target.cmake)
 
+
+find_package(ament_cmake_auto REQUIRED)
+ament_auto_find_build_dependencies()
+
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -30,6 +34,8 @@ find_package(GTSAM REQUIRED)
 find_package(Eigen REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(Boost REQUIRED COMPONENTS timer)
+find_package(common_config REQUIRED)
+
 
 set(ros2_lib "rclcpp;rclpy;std_msgs;sensor_msgs;geometry_msgs;nav_msgs;cv_bridge;pcl_msgs;pcl_conversions;visualization_msgs;tf2;tf2_ros;tf2_eigen;tf2_sensor_msgs;tf2_geometry_msgs")
 
@@ -89,6 +95,10 @@ ament_target_dependencies(${PROJECT_NAME}_featureExtraction rclcpp rclpy std_msg
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(${PROJECT_NAME}_featureExtraction "${cpp_typesupport_target}") 
 
+ament_target_dependencies(
+  ${PROJECT_NAME}_mapOptmization
+  common_config
+)
 
 install(
   DIRECTORY launch config rviz

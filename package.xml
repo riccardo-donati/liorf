@@ -56,6 +56,7 @@
   <exec_depend>GTSAM</exec_depend>
   <exec_depend>Eigen</exec_depend>
   <exec_depend>pcl_conversions</exec_depend>
+  <depend>common_config</depend>
   
   <member_of_group>rosidl_interface_packages</member_of_group>
 
