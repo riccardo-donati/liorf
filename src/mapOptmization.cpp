@@ -712,8 +712,9 @@ public:
         int loopKeyCur    = copy_cloudKeyPoses3D->size() - 1;;
         int loopKeyPre    = detectResult.first;
         float yawDiffRad  = detectResult.second; // not use for v1 (because pcl icp withi initial somthing wrong...)
-        if( loopKeyPre == -1)
+        if( loopKeyPre == -1){
             return;
+        }
 
         auto it = loopIndexContainer.find(loopKeyCur);
         if (it != loopIndexContainer.end())
@@ -726,8 +727,8 @@ public:
         pcl::PointCloud<PointType>::Ptr prevKeyframeCloud(new pcl::PointCloud<PointType>());
         {
             int base_key = 0;
-            loopFindNearKeyframes(cureKeyframeCloud, loopKeyCur, 0, base_key); // giseop 
-            loopFindNearKeyframes(prevKeyframeCloud, loopKeyPre, historyKeyframeSearchNum, base_key); // giseop 
+            loopFindNearKeyframes(cureKeyframeCloud, loopKeyCur, 0, -1); // giseop 
+            loopFindNearKeyframes(prevKeyframeCloud, loopKeyPre, historyKeyframeSearchNum, -1); // giseop 
 
             if (cureKeyframeCloud->size() < 300 || prevKeyframeCloud->size() < 1000)
                 return;
@@ -750,10 +751,10 @@ public:
         icp.align(*unused_result);
 
         if (icp.hasConverged() == false || icp.getFitnessScore() > historyKeyframeFitnessScore){
-            RCLCPP_WARN(get_logger(), "Not converged or low fitness score");
+            RCLCPP_WARN(get_logger(), "Not converged or low fitness score, fitness: %.2f / %.2f , converged: %d",icp.getFitnessScore(),historyKeyframeFitnessScore,icp.hasConverged()   );
             return;
         }
-
+        
         // publish corrected cloud
         if (pubIcpKeyFrames->get_subscription_count() != 0)
         {
