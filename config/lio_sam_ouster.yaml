@@ -3,6 +3,7 @@
     use_sim_time: false
     history_policy: "history_keep_last"
     reliability_policy: "reliability_best_effort"
+    time_debug: false
 
     # Topics
     pointCloudTopic: "/processed_cloud"               # Point cloud data
@@ -19,6 +20,7 @@
     mapFrame: "map"
 
     # GPS Settings
+    TransGps2lidar: [0.14, 0.37, 0.0]             # translation from gps frame to lidarFrame
     gpsPreInitialized: true                     # if using a predefined lla origin
     useImuHeadingInitialization: true           # if using GPS data, set to "true"
     useGpsElevation: false                      # if GPS elevation is bad, set to "false"
@@ -33,9 +35,11 @@
     sensor: ouster                            # lidar sensor type, 'velodyne' or 'ouster' or 'livox' or 'robosense'
     N_SCAN: 64                                  # number of lidar channel (i.e., Velodyne/Ouster: 16, 32, 64, 128, Livox Horizon: 6)
     Horizon_SCAN: 1024                          # lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048, Livox Horizon: 4000)
+    # Horizon_SCAN: 2048                          # lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048, Livox Horizon: 4000)
     downsampleRate: 1                           # default: 1. Downsample your data if too many points(line). i.e., 16 = 64 / 4, 16 = 16 / 1
     point_filter_num: 1                         # default: 3. Downsample your data if too many points(point). e.g., 16: 1, 32: 5, 64: 8
     lidarMinRange: 3.0                          # default: 1.0, minimum lidar range to be used
+    lidarMinZ: 0.0                              # default: -10.0, minimum lidar z to be used
     lidarMaxRange: 150.0                       # default: 1000.0, maximum lidar range to be used
 
     # IMU Settings
@@ -45,14 +49,21 @@
     imuGyrNoise: 1.5636343949698187e-03
     imuAccBiasN: 6.4356659353532566e-05
     imuGyrBiasN: 3.5640318696367613e-05
-    imuGravity: 9.80511
+    imuGravity: 9.507
     imuRPYWeight: 0.01
 
-    # Extrinsics: T_lb (lidar -> imu)
-    extrinsicTrans: [0.8, 0.0, 0.0]
-    extrinsicRot: [-1.0, 0.0, 0.0,
-                    0.0, 1.0, 0.0,
-                    0.0, 0.0, -1.0]
+    # Extrinsics: T_lb (lidar -> imu) 
+    extrinsicTrans: [0.79820547, 0., -0.05355404]
+    extrinsicRot: [
+    -0.99775683,  0.,         -0.06694255,  
+     0.        ,  1.,          0.        ,  
+     0.06694255,  0.,         -0.99775683, 
+     0.        ,  0.,          0.        ]
+    # extrinsicTrans: [0.8, 0.0, 0.0]
+    # extrinsicRot: [-1.0, 0.0, 0.0,
+    #                 0.0, 1.0, 0.0,
+    #                 0.0, 0.0, -1.0]
+  
 
     # This parameter is set only when the 9-axis IMU is used, but it must be a high-precision IMU. e.g. MTI-680
     extrinsicRPY: [1.0, 0.0, 0.0,
@@ -80,7 +91,7 @@
     surroundingkeyframeAddingDistThreshold: 1.0   # meters, regulate keyframe adding threshold
     surroundingkeyframeAddingAngleThreshold: 0.2  # radians, regulate keyframe adding threshold
     surroundingKeyframeDensity: 2.0               # meters, downsample surrounding keyframe poses   
-    surroundingKeyframeSearchRadius: 50.0         # meters, within n meters scan-to-map optimization (when loop closure disabled)
+    surroundingKeyframeSearchRadius: 10.0         # meters, within n meters scan-to-map optimization (when loop closure disabled)
     surroundingKeyframeMapLeafSize: 0.5           # downsample local map point cloud
 
     # Loop closure

@@ -272,20 +272,17 @@ public:
 
     void laserCloudInfoHandler(const liorf::msg::CloudInfo::SharedPtr msgIn)
     {
+        auto startTime = std::chrono::high_resolution_clock::now(); // Start timing
+
         // extract time stamp
         timeLaserInfoStamp = msgIn->header.stamp;
         timeLaserInfoCur = ROS_TIME(msgIn->header.stamp);
 
         // extract info and feature cloud
         cloudInfo = *msgIn;
-        pcl::fromROSMsg(msgIn->cloud_corner,  *laserCloudCornerLast);
-        pcl::fromROSMsg(msgIn->cloud_surface, *laserCloudSurfLast);
 
-        // TODO
-        // ......
-        // remapping
-        // ......
-        // END
+        pcl::fromROSMsg(msgIn->cloud_corner, *laserCloudCornerLast);
+        pcl::fromROSMsg(msgIn->cloud_surface, *laserCloudSurfLast);
 
         std::lock_guard<std::mutex> lock(mtx);
 
@@ -310,7 +307,14 @@ public:
 
             publishFrames();
         }
+
+        auto endTime = std::chrono::high_resolution_clock::now(); // End timing
+        if (time_debug){
+            RCLCPP_INFO(this->get_logger(), "Total time for map optimization: %ld ms",
+                std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count());
+        } 
     }
+
 
     void gpsHandler(const sensor_msgs::msg::NavSatFix::SharedPtr gpsMsg)
     {   
@@ -334,9 +338,11 @@ public:
         nav_msgs::msg::Odometry gps_odom;
         gps_odom.header = gpsMsg->header;
         gps_odom.header.frame_id = "map";
-        gps_odom.pose.pose.position.x = trans_local_[0];
-        gps_odom.pose.pose.position.y = trans_local_[1];
-        gps_odom.pose.pose.position.z = trans_local_[2];
+        
+        gps_odom.pose.pose.position.x = trans_local_[0] + TransGps2lidar[0];
+        gps_odom.pose.pose.position.y = trans_local_[1] + TransGps2lidar[1];
+        gps_odom.pose.pose.position.z = trans_local_[2] + TransGps2lidar[2];
+
         gps_odom.pose.covariance[0] = cov_x;
         gps_odom.pose.covariance[7] = cov_y;
         gps_odom.pose.covariance[14] = cov_z;
@@ -743,8 +749,10 @@ public:
         pcl::PointCloud<PointType>::Ptr unused_result(new pcl::PointCloud<PointType>());
         icp.align(*unused_result);
 
-        if (icp.hasConverged() == false || icp.getFitnessScore() > historyKeyframeFitnessScore)
+        if (icp.hasConverged() == false || icp.getFitnessScore() > historyKeyframeFitnessScore){
+            RCLCPP_WARN(get_logger(), "Not converged or low fitness score");
             return;
+        }
 
         // publish corrected cloud
         if (pubIcpKeyFrames->get_subscription_count() != 0)
@@ -1174,6 +1182,7 @@ public:
             cv::Mat matV1(3, 3, CV_32F, cv::Scalar::all(0));
                     
             if (pointSearchSqDis[4] < 1.0) {
+                // Compute centroid of neighbors
                 float cx = 0, cy = 0, cz = 0;
                 for (int j = 0; j < 5; j++) {
                     cx += laserCloudCornerFromMapDS->points[pointSearchInd[j]].x;
@@ -1182,6 +1191,7 @@ public:
                 }
                 cx /= 5; cy /= 5;  cz /= 5;
 
+                // Compute covariance matrix
                 float a11 = 0, a12 = 0, a13 = 0, a22 = 0, a23 = 0, a33 = 0;
                 for (int j = 0; j < 5; j++) {
                     float ax = laserCloudCornerFromMapDS->points[pointSearchInd[j]].x - cx;
@@ -1198,10 +1208,13 @@ public:
                 matA1.at<float>(1, 0) = a12; matA1.at<float>(1, 1) = a22; matA1.at<float>(1, 2) = a23;
                 matA1.at<float>(2, 0) = a13; matA1.at<float>(2, 1) = a23; matA1.at<float>(2, 2) = a33;
 
+                // Computes eigenvalues (matD1) and eigenvectors (matV1) of the covariance matrix (PCA)
                 cv::eigen(matA1, matD1, matV1);
 
+                // Ensures the largest eigenvalue is significantly larger (3x) than the second, indicating corner shape
                 if (matD1.at<float>(0, 0) > 3 * matD1.at<float>(0, 1)) {
-
+                    
+                    // x1, x2 points belonging to the line
                     float x0 = pointSel.x;
                     float y0 = pointSel.y;
                     float z0 = pointSel.z;
@@ -1218,15 +1231,19 @@ public:
 
                     float l12 = sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) + (z1 - z2)*(z1 - z2));
 
+                    // derivative of the distance ld2 wrt x0
                     float la = ((y1 - y2)*((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1)) 
                               + (z1 - z2)*((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))) / a012 / l12;
 
+                    // derivative of the distance ld2 wrt y0
                     float lb = -((x1 - x2)*((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1)) 
                                - (z1 - z2)*((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1))) / a012 / l12;
 
+                    // derivative of the distance ld2 wrt z0
                     float lc = -((x1 - x2)*((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1)) 
                                + (y1 - y2)*((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1))) / a012 / l12;
 
+                    // distance between x0 and the line betwen x1 and x2
                     float ld2 = a012 / l12;
 
                     float s = 1 - 0.9 * fabs(ld2);
@@ -1269,13 +1286,14 @@ public:
             matB0.fill(-1);
             matX0.setZero();
 
-            if (pointSearchSqDis[4] < 1.0) {
+            if (pointSearchSqDis[4] <  1.0) {
                 for (int j = 0; j < 5; j++) {
                     matA0(j, 0) = laserCloudSurfFromMapDS->points[pointSearchInd[j]].x;
                     matA0(j, 1) = laserCloudSurfFromMapDS->points[pointSearchInd[j]].y;
                     matA0(j, 2) = laserCloudSurfFromMapDS->points[pointSearchInd[j]].z;
                 }
 
+                // Least-squares solution of the linear system matA0 * x = matB0 -> fitted plane
                 matX0 = matA0.colPivHouseholderQr().solve(matB0);
 
                 float pa = matX0(0, 0);
@@ -1283,9 +1301,11 @@ public:
                 float pc = matX0(2, 0);
                 float pd = 1;
 
+                // plane eq: pa*x + pb*y + pc*z +pd = 0
                 float ps = sqrt(pa * pa + pb * pb + pc * pc);
                 pa /= ps; pb /= ps; pc /= ps; pd /= ps;
-
+                
+                // if one of the neighbor points is further than 20cm from the plane -> plane not valid
                 bool planeValid = true;
                 for (int j = 0; j < 5; j++) {
                     if (fabs(pa * laserCloudSurfFromMapDS->points[pointSearchInd[j]].x +
@@ -1299,6 +1319,7 @@ public:
                 if (planeValid) {
                     float pd2 = pa * pointSel.x + pb * pointSel.y + pc * pointSel.z + pd;
 
+                    // s is larger if points is close to the plane and/or point is close to the lidar
                     float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointOri.x * pointOri.x
                             + pointOri.y * pointOri.y + pointOri.z * pointOri.z));
 
@@ -1326,6 +1347,9 @@ public:
                 coeffSel->push_back(coeffSelCornerVec[i]);
             }
         }
+        // auto n_corner_points = laserCloudOri->size();
+        // RCLCPP_WARN(get_logger(), "Corner points for LMOptimization %d points", n_corner_points);
+
         // combine surf coeffs
         for (int i = 0; i < laserCloudSurfLastDSNum; ++i){
             if (laserCloudOriSurfFlag[i] == true){
@@ -1333,11 +1357,13 @@ public:
                 coeffSel->push_back(coeffSelSurfVec[i]);
             }
         }
+        // RCLCPP_WARN(get_logger(), "Surf points for LMOptimization %d points", laserCloudOri->size() - n_corner_points);
+
         // reset flag for next iteration
         std::fill(laserCloudOriCornerFlag.begin(), laserCloudOriCornerFlag.end(), false);
         std::fill(laserCloudOriSurfFlag.begin(), laserCloudOriSurfFlag.end(), false);
     }
-
+    
     bool LMOptimization(int iterCount)
     {
         // This optimization is from the original loam_velodyne by Ji Zhang, need to cope with coordinate transformation
@@ -1361,7 +1387,7 @@ public:
         if (laserCloudSelNum < 50) {
             return false;
         }
-
+    
         cv::Mat matA(laserCloudSelNum, 6, CV_32F, cv::Scalar::all(0));
         cv::Mat matAt(6, laserCloudSelNum, CV_32F, cv::Scalar::all(0));
         cv::Mat matAtA(6, 6, CV_32F, cv::Scalar::all(0));
@@ -1476,7 +1502,7 @@ public:
     }
 
     void scan2MapOptimization()
-    {
+    {   
         if (cloudKeyPoses3D->points.empty())
             return;
 
@@ -1534,6 +1560,9 @@ public:
         transformTobeMapped[1] = constraintTransformation(transformTobeMapped[1], rotation_tollerance);
         transformTobeMapped[5] = constraintTransformation(transformTobeMapped[5], z_tollerance);
 
+        transformTobeMapped[0] = 0; //roll
+        transformTobeMapped[1] = 0; // pitch
+        transformTobeMapped[5] = 0; // z
         incrementalOdometryAffineBack = trans2Affine3f(transformTobeMapped);
     }
 
@@ -1785,6 +1814,10 @@ public:
         transformTobeMapped[3] = latestEstimate.translation().x();
         transformTobeMapped[4] = latestEstimate.translation().y();
         transformTobeMapped[5] = latestEstimate.translation().z();
+
+        transformTobeMapped[0] = 0; // TEMP roll 0
+        transformTobeMapped[1] = 0; // TEMP pitch 0
+        transformTobeMapped[5] = 0; // TEMP z 0
 
         // save all the received edge and surf points
         pcl::PointCloud<PointType>::Ptr thisCornerKeyFrame(new pcl::PointCloud<PointType>());

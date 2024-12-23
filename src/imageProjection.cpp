@@ -210,6 +210,8 @@ public:
 
     void cloudHandler(const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg)
     {   
+        auto startTime = std::chrono::high_resolution_clock::now(); // start timing
+
         if (!cachePointCloud(laserCloudMsg))
             return;
 
@@ -223,6 +225,12 @@ public:
         publishClouds();
 
         resetParameters();
+        
+        auto endTime = std::chrono::high_resolution_clock::now(); // End timing
+        if (time_debug){
+            RCLCPP_INFO(this->get_logger(), "Total time for image projection: %ld ms",
+                std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count());
+        } 
     }
 
     bool cachePointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr& laserCloudMsg)
@@ -601,7 +609,7 @@ public:
             thisPoint.x = laserCloudIn->points[i].x;
             thisPoint.y = laserCloudIn->points[i].y;
             thisPoint.z = laserCloudIn->points[i].z;
-            if(thisPoint.z <= 0)
+            if(thisPoint.z <= lidarMinZ)
                 continue;
             thisPoint.intensity = laserCloudIn->points[i].intensity;
 

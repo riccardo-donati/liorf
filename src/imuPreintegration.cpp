@@ -44,6 +44,8 @@ public:
     double lidarOdomTime = -1;
     deque<nav_msgs::msg::Odometry> imuOdomQueue;
 
+    const double delta_t = 0.1;
+
     TransformFusion(const rclcpp::NodeOptions & options) : ParamServer("liorf_transformFusion", options)
     {
         tfBuffer = std::make_shared<tf2_ros::Buffer>(get_clock());
@@ -92,23 +94,29 @@ public:
 
         lidarOdomAffine = odom2affine(*odomMsg);
 
-        lidarOdomTime = ROS_TIME(odomMsg->header.stamp);
+        lidarOdomTime = ROS_TIME(odomMsg->header.stamp) - delta_t;
     }
 
     void imuOdometryHandler(const nav_msgs::msg::Odometry::SharedPtr odomMsg)
-    {
+    {      
+        auto imuOdomTime = ROS_TIME(odomMsg->header.stamp);
+        rclcpp::Time t(static_cast<uint64_t>(imuOdomTime * 1e9));
+        tf2::TimePoint time_point_odom_imu = tf2_ros::fromRclcpp(t);
+
         // static tf
         tf2::Quaternion quat_tf;
         // quat_tf.setRPY(0, 0, 0);
         // tf2::Transform map_to_odom = tf2::Transform(quat_tf, tf2::Vector3(0, 0, 0));
-        rclcpp::Time t(static_cast<uint32_t>(lidarOdomTime * 1e9));
-        tf2::TimePoint time_point = tf2_ros::fromRclcpp(t);
+        rclcpp::Time t_imu(static_cast<uint64_t>(lidarOdomTime * 1e9));
+        tf2::TimePoint time_point = tf2_ros::fromRclcpp(t_imu);
         // tf2::Stamped<tf2::Transform> temp_map_to_odom(map_to_odom, time_point, mapFrame);
         // geometry_msgs::msg::TransformStamped trans_map_to_odom;
         // tf2::convert(temp_map_to_odom, trans_map_to_odom);
         // trans_map_to_odom.child_frame_id = odometryFrame;
         // tfMap2Odom->sendTransform(trans_map_to_odom);
-
+        
+        // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "imu odom time - lidar odom time: %.4f", imuOdomTime - lidarOdomTime);
+        
         std::lock_guard<std::mutex> lock(mtx);
 
         imuOdomQueue.push_back(*odomMsg);
@@ -146,8 +154,8 @@ public:
                                 tf2::Vector3(laserOdometry.pose.pose.position.x, laserOdometry.pose.pose.position.y, laserOdometry.pose.pose.position.z));
         if(lidarFrame != baselinkFrame)
             tCur *= lidar2Baselink;
-
-        tf2::Stamped<tf2::Transform> temp_odom_to_base(tCur, time_point, odometryFrame);
+        // tf2::Stamped<tf2::Transform> temp_odom_to_base(tCur, time_point, odometryFrame); 
+        tf2::Stamped<tf2::Transform> temp_odom_to_base(tCur, time_point_odom_imu, odometryFrame);
         geometry_msgs::msg::TransformStamped trans_odom_to_base_link;
         tf2::convert(temp_odom_to_base, trans_odom_to_base_link);
         trans_odom_to_base_link.child_frame_id = baselinkFrame;
@@ -220,7 +228,7 @@ public:
     gtsam::NonlinearFactorGraph graphFactors;
     gtsam::Values graphValues;
 
-    const double delta_t = 0;
+    const double delta_t = 0.1;
 
     int key = 1;
     
@@ -517,13 +525,19 @@ public:
         gtsam::Pose3 imuPose = gtsam::Pose3(currentState.quaternion(), currentState.position());
         gtsam::Pose3 lidarPose = imuPose.compose(imu2Lidar);
 
-        odometry.pose.pose.position.x = lidarPose.translation().x();
-        odometry.pose.pose.position.y = lidarPose.translation().y();
-        odometry.pose.pose.position.z = lidarPose.translation().z();
-        odometry.pose.pose.orientation.x = lidarPose.rotation().toQuaternion().x();
-        odometry.pose.pose.orientation.y = lidarPose.rotation().toQuaternion().y();
-        odometry.pose.pose.orientation.z = lidarPose.rotation().toQuaternion().z();
-        odometry.pose.pose.orientation.w = lidarPose.rotation().toQuaternion().w();
+        // Set roll pitch and z to 0
+        double yaw = lidarPose.rotation().yaw(); // Extract yaw in radians
+        gtsam::Rot3 yawOnlyRotation = gtsam::Rot3::Yaw(yaw);
+        gtsam::Point3 adjustedTranslation( lidarPose.translation().x(),  lidarPose.translation().y(), 0.0); // Set z to 0
+        gtsam::Pose3 lidarPoseYawOnly = gtsam::Pose3(yawOnlyRotation, adjustedTranslation);
+
+        odometry.pose.pose.position.x = lidarPoseYawOnly.translation().x();
+        odometry.pose.pose.position.y = lidarPoseYawOnly.translation().y();
+        odometry.pose.pose.position.z = lidarPoseYawOnly.translation().z();
+        odometry.pose.pose.orientation.x = lidarPoseYawOnly.rotation().toQuaternion().x();
+        odometry.pose.pose.orientation.y = lidarPoseYawOnly.rotation().toQuaternion().y();
+        odometry.pose.pose.orientation.z = lidarPoseYawOnly.rotation().toQuaternion().z();
+        odometry.pose.pose.orientation.w = lidarPoseYawOnly.rotation().toQuaternion().w();
         
         odometry.twist.twist.linear.x = currentState.velocity().x();
         odometry.twist.twist.linear.y = currentState.velocity().y();

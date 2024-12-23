@@ -70,7 +70,9 @@ public:
     }
 
     void laserCloudInfoHandler(const liorf::msg::CloudInfo::SharedPtr msgIn)
-    {
+    {   
+        auto startTime = std::chrono::high_resolution_clock::now(); // start timing
+        
         cloudInfo = *msgIn; // new cloud info
         cloudHeader = msgIn->header; // new cloud header
         pcl::fromROSMsg(msgIn->cloud_deskewed, *extractedCloud); // new cloud for extraction
@@ -82,6 +84,12 @@ public:
         extractFeatures();
 
         publishFeatureCloud();
+
+        auto endTime = std::chrono::high_resolution_clock::now(); // End timing
+        if (time_debug){
+            RCLCPP_INFO(this->get_logger(), "Total time for feature extraction: %ld ms",
+                std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count());
+        } 
     }
 
     void calculateSmoothness()

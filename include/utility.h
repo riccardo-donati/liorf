@@ -4,6 +4,8 @@
 #define PCL_NO_PRECOMPILE 
 // <!-- liorf_yjz_lucky_boy -->
 #include <rclcpp/rclcpp.hpp>
+#include <chrono>
+#include <iostream>
 
 #include <std_msgs/msg/header.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -106,6 +108,7 @@ public:
     int downsampleRate;
     int point_filter_num;
     float lidarMinRange;
+    float lidarMinZ;
     float lidarMaxRange;
 
     // IMU
@@ -120,6 +123,7 @@ public:
     vector<double> extRotV;
     vector<double> extRPYV;
     vector<double> extTransV;
+    vector<double> TransGps2lidar;
     Eigen::Matrix3d extRot;
     Eigen::Matrix3d extRPY;
     Eigen::Vector3d extTrans;
@@ -165,6 +169,9 @@ public:
 
     // Gps initialization
     bool gpsPreInitialized;
+
+    // Debug
+    bool time_debug;
 
     ParamServer(std::string node_name, const rclcpp::NodeOptions & options) : Node(node_name, options)
     {   
@@ -243,6 +250,8 @@ public:
         get_parameter("point_filter_num", point_filter_num);
         declare_parameter<float>("lidarMinRange", 1.0f);
         get_parameter("lidarMinRange", lidarMinRange);
+        declare_parameter<float>("lidarMinZ", -10.0f);
+        get_parameter("lidarMinZ", lidarMinZ);
         declare_parameter<float>("lidarMaxRange", 1000.0f);
         get_parameter("lidarMaxRange", lidarMaxRange);
 
@@ -275,6 +284,8 @@ public:
         std::vector < double > ze(zea, std::end(zea));
         declare_parameter("extrinsicTrans", ze);
         get_parameter("extrinsicTrans", extTransV);
+        declare_parameter("TransGps2lidar", ze);
+        get_parameter("TransGps2lidar", TransGps2lidar);
 
         extRot = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extRotV.data(), 3, 3);
         extRPY = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extRPYV.data(), 3, 3);
@@ -346,6 +357,9 @@ public:
         declare_parameter<bool>("gpsPreInitialized", false);
         get_parameter("gpsPreInitialized", gpsPreInitialized);
 
+        declare_parameter<bool>("time_debug", false);
+        get_parameter("time_debug", time_debug);
+        
         usleep(100);
     }
 
